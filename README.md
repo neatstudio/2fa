@@ -2,7 +2,7 @@
 
 一个本地命令行 TOTP/2FA 验证码管理工具，用来替代手机 authenticator app 的日常查看场景。
 
-运行 `2fa` 后，它会在终端中显示所有已绑定账号的当前验证码、倒计时、分组和备注；也可以按分组过滤，例如 `2fa game`、`2fa work`。
+运行 `2fa list` 后，它会在终端中显示所有已绑定账号的当前验证码、倒计时、分组和备注；也可以按分组过滤，例如 `2fa list game`、`2fa ls work`。
 
 ## 功能
 
@@ -53,24 +53,67 @@ go install ./cmd/2fa
 2fa add --name github --secret "JBSWY3DPEHPK3PXP" --group work --note "GitHub admin login"
 ```
 
-查看所有账号：
+查看帮助：
 
 ```sh
 2fa
 ```
 
+查看所有账号：
+
+```sh
+2fa list
+2fa ls
+```
+
 只输出一次，适合脚本或复制：
 
 ```sh
-2fa --once
+2fa list --once
 ```
 
 按分组查看：
 
 ```sh
-2fa game
-2fa work --once
+2fa list game
+2fa ls work --once
 ```
+
+启动本地 Web UI：
+
+```sh
+2fa serve
+```
+
+启动后终端会打印带进程内临时会话 token 的访问地址，例如：
+
+```text
+2fa web UI: http://127.0.0.1:23832/?token=...
+```
+
+默认会监听：
+
+- `127.0.0.1:23832`
+- 当前机器上属于 `100.64.0.0/10` 的地址，例如 Tailscale/CGNAT 地址
+
+默认不会监听 `0.0.0.0` 或公网网卡。这里的 `100` 网段按 Tailscale/CGNAT 的 `100.64.0.0/10` 处理，不是整个 `100.0.0.0/8`；如果确实需要其它网段，可以显式放行：
+
+```sh
+2fa serve --port 23833
+2fa serve --addr 100.101.102.103:23832
+2fa serve --addr 0.0.0.0:23832 --allow 192.168.1.0/24
+2fa serve --allow 100.0.0.0/8
+```
+
+Web UI 支持：
+
+- 实时查看验证码和倒计时
+- 按分组过滤
+- 新增账号
+- 编辑 group/note/secret
+- 删除账号
+
+Web UI 不会在 API 或页面中返回原始 secret；编辑时 secret 输入框不会预填，留空表示不修改。
 
 编辑账号：
 
@@ -137,6 +180,8 @@ chmod 600 ~/.2fa/accounts.json
 
 本工具把 TOTP secret 以明文 base32 保存到本地 JSON 文件中，只依赖本地文件权限保护。
 
+`2fa serve` 会生成进程内临时 token，并对请求来源做默认限制：允许 `127.0.0.0/8`、`::1/128` 和 `100.64.0.0/10`。即便如此，Web 页面里的实时验证码也属于敏感信息，不要把服务暴露给不可信网络。
+
 它不会：
 
 - 加密 secret
@@ -163,6 +208,6 @@ go test ./...
 ```sh
 store=$(mktemp)
 2fa --store "$store" add --name demo --secret JBSWY3DPEHPK3PXP --group test --note demo
-2fa --store "$store" test --once
+2fa --store "$store" list test --once
 2fa --store "$store" delete demo --yes
 ```

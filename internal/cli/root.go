@@ -17,6 +17,7 @@ import (
 	"github.com/gouki/tools/2fa/internal/store"
 	"github.com/gouki/tools/2fa/internal/totp"
 	"github.com/gouki/tools/2fa/internal/ui"
+	"github.com/gouki/tools/2fa/internal/web"
 )
 
 type rootOptions struct {
@@ -48,7 +49,8 @@ func Run(args []string, in io.Reader, out io.Writer, errOut io.Writer) error {
 
 	rest := root.Args()
 	if len(rest) == 0 {
-		return listAccounts(opts, "", out)
+		fmt.Fprint(out, helpText(defaultPath))
+		return nil
 	}
 
 	switch rest[0] {
@@ -56,8 +58,12 @@ func Run(args []string, in io.Reader, out io.Writer, errOut io.Writer) error {
 		return addAccount(opts.storePath, rest[1:], out, errOut)
 	case "edit":
 		return editAccount(opts.storePath, rest[1:], out, errOut)
+	case "ls", "list":
+		return listAccountCommand(opts, rest[1:], out)
 	case "delete", "rm":
 		return deleteAccount(opts.storePath, rest[1:], in, out, errOut)
+	case "serve":
+		return serveAccounts(opts.storePath, rest[1:], out, errOut)
 	case "help", "--help", "-h":
 		fmt.Fprint(out, helpText(defaultPath))
 		return nil
@@ -65,10 +71,7 @@ func Run(args []string, in io.Reader, out io.Writer, errOut io.Writer) error {
 		if strings.HasPrefix(rest[0], "-") {
 			return fmt.Errorf("unknown option: %s", rest[0])
 		}
-		if len(rest) > 1 {
-			return fmt.Errorf("unexpected argument: %s", rest[1])
-		}
-		return listAccounts(opts, rest[0], out)
+		return fmt.Errorf("unknown command %q; use `2fa list %s` to list a group named %q", rest[0], rest[0], rest[0])
 	}
 }
 
@@ -76,15 +79,20 @@ func helpText(defaultPath string) string {
 	return fmt.Sprintf(`2fa - local TOTP account viewer
 
 Usage:
-  2fa [--once] [--store PATH] [group]
+  2fa [--once] [--store PATH]
+  2fa [--once] [--store PATH] list [group]
+  2fa [--once] [--store PATH] ls [group]
   2fa [--store PATH] add --name NAME --secret BASE32 [--group GROUP] [--note NOTE]
   2fa [--store PATH] edit NAME [--secret BASE32] [--group GROUP] [--note NOTE]
   2fa [--store PATH] delete NAME [--yes]
+  2fa [--store PATH] serve [--port PORT] [--addr ADDR] [--allow CIDR] [group]
 
 Commands:
+  list, ls  list all accounts or one group
   add       add a TOTP account; name must be globally unique
   edit      update group, note, secret, or any combination
   delete    delete an account by name; asks for confirmation by default
+  serve     start the local authenticated web UI
 
 Options:
   --once        print one table and exit
@@ -234,6 +242,39 @@ func deleteAccount(path string, args []string, in io.Reader, out io.Writer, errO
 	return err
 }
 
+func listAccountCommand(opts rootOptions, args []string, out io.Writer) error {
+	if len(args) > 1 {
+		return fmt.Errorf("unexpected argument: %s", args[1])
+	}
+	group := ""
+	if len(args) == 1 {
+		group = args[0]
+	}
+	return listAccounts(opts, group, out)
+}
+
+func serveAccounts(path string, args []string, out io.Writer, errOut io.Writer) error {
+	fs := flag.NewFlagSet("2fa serve", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	port := fs.Int("port", web.DefaultPort, "HTTP port")
+	addr := fs.String("addr", "", "explicit listen address")
+	allows := repeatStringFlag{}
+	fs.Var(&allows, "allow", "additional allowed IP or CIDR")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() > 1 {
+		return fmt.Errorf("unexpected argument: %s", fs.Arg(1))
+	}
+	group := ""
+	if fs.NArg() == 1 {
+		group = fs.Arg(0)
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	return web.ListenAndServe(ctx, web.Options{StorePath: path, Port: *port, Addr: *addr, Allows: allows, Group: group}, out)
+}
+
 func listAccounts(opts rootOptions, group string, out io.Writer) error {
 	st := store.New(opts.storePath)
 	accounts, err := st.Load()
@@ -296,6 +337,17 @@ func optionalStringFlag(fs *flag.FlagSet, name, usage string) *optionalStringVal
 	v := &optionalStringValue{}
 	fs.Var(v, name, usage)
 	return v
+}
+
+type repeatStringFlag []string
+
+func (v *repeatStringFlag) Set(value string) error {
+	*v = append(*v, value)
+	return nil
+}
+
+func (v *repeatStringFlag) String() string {
+	return strings.Join(*v, ",")
 }
 
 type optionalStringValue struct {

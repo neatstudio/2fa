@@ -24,7 +24,7 @@ func TestRunAddListEditDeleteWithStore(t *testing.T) {
 
 	out.Reset()
 	errOut.Reset()
-	err = Run([]string{"--store", path, "--once"}, strings.NewReader(""), &out, &errOut)
+	err = Run([]string{"--store", path, "list", "--once"}, strings.NewReader(""), &out, &errOut)
 	if err != nil {
 		t.Fatalf("list returned error: %v; stderr=%s", err, errOut.String())
 	}
@@ -44,7 +44,7 @@ func TestRunAddListEditDeleteWithStore(t *testing.T) {
 
 	out.Reset()
 	errOut.Reset()
-	err = Run([]string{"--store", path, "game", "--once"}, strings.NewReader(""), &out, &errOut)
+	err = Run([]string{"--store", path, "list", "game", "--once"}, strings.NewReader(""), &out, &errOut)
 	if err != nil {
 		t.Fatalf("group list returned error: %v; stderr=%s", err, errOut.String())
 	}
@@ -61,12 +61,22 @@ func TestRunAddListEditDeleteWithStore(t *testing.T) {
 
 	out.Reset()
 	errOut.Reset()
-	err = Run([]string{"--store", path, "--once"}, strings.NewReader(""), &out, &errOut)
+	err = Run([]string{"--store", path, "list", "--once"}, strings.NewReader(""), &out, &errOut)
 	if err != nil {
 		t.Fatalf("list after delete returned error: %v; stderr=%s", err, errOut.String())
 	}
 	if strings.Contains(out.String(), "github") {
 		t.Fatalf("deleted account still listed:\n%s", out.String())
+	}
+}
+
+func TestRunNoArgsShowsHelp(t *testing.T) {
+	var out bytes.Buffer
+	if err := Run(nil, strings.NewReader(""), &out, &bytes.Buffer{}); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(out.String(), "Usage:") || !strings.Contains(out.String(), "list [group]") {
+		t.Fatalf("expected help output, got:\n%s", out.String())
 	}
 }
 
@@ -78,6 +88,16 @@ func TestRunRejectsDuplicateAdd(t *testing.T) {
 	}
 	if err := Run(args, strings.NewReader(""), &bytes.Buffer{}, &bytes.Buffer{}); err == nil {
 		t.Fatal("second add succeeded, want duplicate-name error")
+	}
+}
+
+func TestRunServeDispatch(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "accounts.json")
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	err := Run([]string{"--store", path, "serve", "--addr", "0.0.0.0:23832"}, strings.NewReader(""), &out, &errOut)
+	if err == nil || !strings.Contains(err.Error(), "wildcard --addr") {
+		t.Fatalf("expected serve command to parse and reject wildcard bind, got err=%v out=%q stderr=%q", err, out.String(), errOut.String())
 	}
 }
 
