@@ -1,0 +1,168 @@
+# 2FA CLI
+
+一个本地命令行 TOTP/2FA 验证码管理工具，用来替代手机 authenticator app 的日常查看场景。
+
+运行 `2fa` 后，它会在终端中显示所有已绑定账号的当前验证码、倒计时、分组和备注；也可以按分组过滤，例如 `2fa game`、`2fa work`。
+
+## 功能
+
+- 本地保存 TOTP 账号和 base32 secret
+- 生成标准 6 位 TOTP 验证码
+- 默认 30 秒周期，HMAC-SHA1，兼容常见 authenticator app
+- 表格展示分组、账号、验证码、剩余秒数、备注
+- 交互终端中默认每秒刷新
+- 管道、重定向或 `--once` 模式下单次输出
+- 支持分组过滤
+- 支持新增、编辑、删除账号
+- 默认数据文件权限限制为当前用户读写
+
+## 安装
+
+本项目是 Go CLI。
+
+```sh
+go test ./...
+go build -o bin/2fa ./cmd/2fa
+```
+
+如果 `~/.local/bin` 在你的 `PATH` 中，可以创建软链接：
+
+```sh
+ln -s "$PWD/bin/2fa" ~/.local/bin/2fa
+```
+
+也可以直接安装到 Go bin 目录：
+
+```sh
+go install ./cmd/2fa
+```
+
+确保 `$(go env GOPATH)/bin` 在 `PATH` 中。
+
+## 使用
+
+查看帮助：
+
+```sh
+2fa --help
+```
+
+新增账号：
+
+```sh
+2fa add --name github --secret "JBSWY3DPEHPK3PXP" --group work --note "GitHub admin login"
+```
+
+查看所有账号：
+
+```sh
+2fa
+```
+
+只输出一次，适合脚本或复制：
+
+```sh
+2fa --once
+```
+
+按分组查看：
+
+```sh
+2fa game
+2fa work --once
+```
+
+编辑账号：
+
+```sh
+2fa edit github --group account
+2fa edit github --note "primary admin account"
+2fa edit github --secret "JBSWY3DPEHPK3PXP"
+```
+
+删除账号：
+
+```sh
+2fa delete github
+```
+
+跳过删除确认：
+
+```sh
+2fa delete github --yes
+```
+
+## 数据存储
+
+默认数据文件：
+
+```text
+~/.2fa/accounts.json
+```
+
+默认行为：
+
+- `~/.2fa` 目录权限为 `0700`
+- `~/.2fa/accounts.json` 文件权限为 `0600`
+- 普通列表输出不会显示原始 secret
+- 写入时使用同目录临时文件和 rename，降低写坏文件的概率
+
+开发或测试时可指定自定义存储文件：
+
+```sh
+2fa --store /tmp/accounts.json --once
+```
+
+如果自定义 store 的父目录已经存在，程序不会修改该父目录权限，但仍会确保账号文件为 `0600`。
+
+## 备份和恢复
+
+备份：
+
+```sh
+cp ~/.2fa/accounts.json ~/accounts.json.backup
+chmod 600 ~/accounts.json.backup
+```
+
+恢复：
+
+```sh
+mkdir -p ~/.2fa
+chmod 700 ~/.2fa
+cp ~/accounts.json.backup ~/.2fa/accounts.json
+chmod 600 ~/.2fa/accounts.json
+```
+
+## 安全边界
+
+本工具把 TOTP secret 以明文 base32 保存到本地 JSON 文件中，只依赖本地文件权限保护。
+
+它不会：
+
+- 加密 secret
+- 使用系统 Keychain
+- 防止同一用户权限下的恶意进程读取文件
+- 防止机器被入侵后的 secret 泄露
+
+请把 `~/.2fa/accounts.json` 和它的备份都当作敏感文件处理。
+
+## 时间同步
+
+TOTP 依赖本机系统时间。如果验证码被服务端拒绝，请先确认系统时间和时区正确，并开启系统时间同步。
+
+## 开发
+
+运行测试：
+
+```sh
+go test ./...
+```
+
+临时 store 冒烟测试：
+
+```sh
+store=$(mktemp)
+2fa --store "$store" add --name demo --secret JBSWY3DPEHPK3PXP --group test --note demo
+2fa --store "$store" test --once
+2fa --store "$store" delete demo --yes
+```

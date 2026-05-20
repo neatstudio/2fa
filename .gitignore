@@ -1,0 +1,5 @@
+bin/
+.codex-workers/
+.DS_Store
+*.tmp
+*.log
