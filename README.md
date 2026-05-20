@@ -41,10 +41,11 @@ go install ./cmd/2fa
 
 ## 使用
 
-查看帮助：
+查看帮助和版本：
 
 ```sh
 2fa --help
+2fa --version
 ```
 
 新增账号：
@@ -194,6 +195,31 @@ chmod 600 ~/.2fa/accounts.json
 ## 时间同步
 
 TOTP 依赖本机系统时间。如果验证码被服务端拒绝，请先确认系统时间和时区正确，并开启系统时间同步。
+
+## 发布打包
+
+本项目通过 GitHub Actions 自动发布。
+
+触发方式：
+
+- 推送 `v*` tag，例如 `v1.0.0`
+- 或在 GitHub Actions 页面手动运行 `Release` workflow，并填写版本号
+
+Release workflow 会：
+
+- 运行 `go test ./...`
+- 交叉编译 macOS/Linux/Windows 的 amd64/arm64 产物
+- 生成 `SHA256SUMS`
+- 生成 `RELEASE_NOTES.md`
+- 创建 GitHub Release 并上传归档文件
+
+本地也可以复用同一套脚本：
+
+```sh
+make package VERSION=v1.0.0
+```
+
+产物会生成到 `dist/`。
 
 ## 开发
 
