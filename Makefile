@@ -2,12 +2,12 @@ APP := 2fa
 MAIN := ./cmd/2fa
 BIN_DIR := bin
 DIST_DIR := dist
-VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+VERSION ?= $(shell tr -d '[:space:]' < VERSION)
 COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null || echo unknown)
 DATE := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
 LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.date=$(DATE)
 
-.PHONY: test build install package clean release-notes
+.PHONY: test build install package clean release-notes tag
 
 test:
 	go test ./...
@@ -25,6 +25,12 @@ package:
 
 release-notes:
 	VERSION=$(VERSION) ./scripts/release-notes.sh
+
+tag:
+	git diff --quiet
+	git diff --cached --quiet
+	git tag $(VERSION)
+	git push origin main $(VERSION)
 
 clean:
 	rm -rf $(BIN_DIR) $(DIST_DIR)

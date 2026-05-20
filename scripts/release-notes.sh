@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 set -eu
 
-VERSION="${1:-${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}}"
+VERSION="${1:-${VERSION:-$(tr -d '[:space:]' < VERSION)}}"
 
 cat <<EOF
 # 2FA CLI $VERSION

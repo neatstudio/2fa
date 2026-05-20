@@ -198,12 +198,19 @@ TOTP 依赖本机系统时间。如果验证码被服务端拒绝，请先确认
 
 ## 发布打包
 
-本项目通过 GitHub Actions 自动发布。
+本项目通过 `VERSION` 文件和 GitHub Actions 自动发布。
 
-触发方式：
+发布步骤：
 
-- 推送 `v*` tag，例如 `v1.0.0`
-- 或在 GitHub Actions 页面手动运行 `Release` workflow，并填写版本号
+1. 修改 `VERSION`，例如 `v1.0.0`
+2. 提交并推送该版本变更
+3. 创建同名 tag 并推送，例如：
+
+```sh
+make tag
+```
+
+`Release` workflow 也可以在 GitHub Actions 页面手动运行，但它仍会读取仓库里的 `VERSION` 文件作为唯一版本源。
 
 Release workflow 会：
 
@@ -216,7 +223,7 @@ Release workflow 会：
 本地也可以复用同一套脚本：
 
 ```sh
-make package VERSION=v1.0.0
+make package
 ```
 
 产物会生成到 `dist/`。

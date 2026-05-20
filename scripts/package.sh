@@ -2,7 +2,7 @@
 set -eu
 
 APP="2fa"
-VERSION="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo dev)}"
+VERSION="${VERSION:-$(tr -d '[:space:]' < VERSION)}"
 COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 DIST_DIR="dist"
